@@ -15,9 +15,13 @@
 #![deny(unused_imports)]
 
 
+#[macro_use]
+extern crate log;
 extern crate chrono;
 
+
 pub mod job;
+pub mod scheduler;
 
 // Re-exports
 pub use job::{Job, TimeSpan};

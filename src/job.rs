@@ -6,9 +6,14 @@ use std::fmt::{Formatter, Debug, Error};
 use chrono::{Duration, Local, DateTime};
 
 
+/// An alias for a boxed closure.
+pub type Func = Box<Fn() + Send + Sync>;
+
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy)]
 pub enum TimeSpan {
+    Millisecond,
+    Milliseconds,
     Second,
     Seconds,
     Minute,
@@ -29,7 +34,7 @@ pub struct Job {
     next_run: Option<DateTime<Local>>,
     once_off: bool,
     name: Option<String>,
-    func: Option<Box<Fn()>>,
+    func: Option<Func>,
     times_run: u32,
 }
 
@@ -42,9 +47,8 @@ impl Debug for Job {
     }
 }
 
-impl Job {
-    /// Construct a bare Job.
-    pub fn new() -> Self {
+impl Default for Job {
+    fn default() -> Job {
         Job {
             last_run: Local::now(),
             next_run: None,
@@ -54,6 +58,13 @@ impl Job {
             func: None,
             times_run: 0,
         }
+    }
+}
+
+impl Job {
+    /// Construct a bare Job.
+    pub fn new() -> Self {
+        Job::default()
     }
 
     /// Give the job a name.
@@ -89,6 +100,7 @@ impl Job {
     /// Increase the duration between runs by a certain amount.
     fn increment(&mut self, n: i64, delta_type: TimeSpan) {
         let new_duration = match delta_type {
+            TimeSpan::Millisecond | TimeSpan::Milliseconds => Duration::milliseconds(n),
             TimeSpan::Second | TimeSpan::Seconds => Duration::seconds(n),
             TimeSpan::Minute | TimeSpan::Minutes => Duration::minutes(n),
             TimeSpan::Hour | TimeSpan::Hours => Duration::hours(n),
@@ -105,7 +117,7 @@ impl Job {
 
     /// Give the job a closure to run and validate that everything has been
     /// entered correctly.
-    pub fn run(mut self, f: Box<Fn()>) -> Result<Job, String> {
+    pub fn run(mut self, f: Func) -> Result<Job, String> {
         self.func = Some(f);
         self.validate()
     }
@@ -133,7 +145,7 @@ impl Job {
 
     /// Run the job and update the metadata recording when the last time this
     /// job was run.
-    fn _execute(&mut self) -> Result<(), String> {
+    pub fn execute(&mut self) -> Result<(), String> {
         self.last_run = Local::now();
 
         // Update the next run or set it to None if this was a
@@ -161,6 +173,11 @@ impl Job {
             Some(next) => next <= Local::now(),
             None => false,
         }
+    }
+
+    /// The next time this job should be run.
+    pub fn next_run(&self) -> Option<DateTime<Local>> {
+        self.next_run
     }
 }
 
@@ -234,7 +251,7 @@ mod tests {
         assert_eq!(job.times_run(), 0);
 
         // Now actually run the job;
-        job._execute().unwrap();
+        job.execute().unwrap();
 
         assert_eq!(*num.lock().unwrap(), 42);
 
@@ -268,7 +285,7 @@ mod tests {
                 1 + 1;
             }))
             .unwrap();
-        job._execute().unwrap();
+        job.execute().unwrap();
         assert!(!job.ready());
     }
 }

@@ -5,3 +5,4 @@ authors = ["Michael Bryan <michaelfbryan@gmail.com>"]
 
 [dependencies]
 chrono = { version = "0.2", features = ["rustc-serialize"] }
+log = "0.3"
