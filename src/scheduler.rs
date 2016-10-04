@@ -37,11 +37,13 @@ impl Scheduler {
 
     /// Get the time until the next job is due to be executed.
     pub fn time_to_next(&self) -> Option<Duration> {
-        let times: Vec<_> = self.job_queue.iter().filter(|j| j.next_run().is_some())
-            .map(|j| Local::now() - j.next_run().unwrap())
+        let times: Vec<_> = self.job_queue
+            .iter()
+            .filter(|j| j.next_run().is_some())
+            .map(|j| j.next_run().unwrap() - Local::now())
             .collect();
 
-        times.iter().max().map(|t| t.clone())
+        times.iter().min().map(|t| t.clone())
     }
 
     /// Run any pending jobs and return the number of jobs run.
@@ -67,10 +69,13 @@ impl Scheduler {
             let delay = self.time_to_next();
             match delay {
                 Some(wait_duration) => {
-                    thread::sleep(wait_duration.to_std().unwrap());
+                    let wait_duration = wait_duration.to_std().unwrap();
+                    info!("Executing next task in {:?}", wait_duration);
+
+                    thread::sleep(wait_duration);
                     self.run_pending();
-                },
-                None => break
+                }
+                None => break,
             }
         }
     }
@@ -94,8 +99,8 @@ mod test {
 
     #[test]
     fn add_job_to_queue() {
-        let job = Job::every(5, Minutes).run(Box::new(|| ())).unwrap();
-        let job_2 = Job::every(5, Minutes).run(Box::new(|| ())).unwrap();
+        let job = Job::every(5, Minutes).do_(Box::new(|| ())).unwrap();
+        let job_2 = Job::every(5, Minutes).do_(Box::new(|| ())).unwrap();
         let mut sched = Scheduler::new();
         assert!(sched.job_queue.is_empty());
 
@@ -116,7 +121,7 @@ mod test {
 
     #[test]
     fn queue_with_pending_task() {
-        let job = Job::every(10, Milliseconds).run(Box::new(|| ())).unwrap();
+        let job = Job::every(10, Milliseconds).do_(Box::new(|| ())).unwrap();
 
         // Wait until after the job is ready
         sleep(Duration_std::from_millis(11));
@@ -137,7 +142,7 @@ mod test {
         let num_2 = num.clone();
 
         let job = Job::every(10, Milliseconds)
-            .run(Box::new(move || {
+            .do_(Box::new(move || {
                 let mut n = num_2.lock().unwrap();
                 *n = 42;
             }))

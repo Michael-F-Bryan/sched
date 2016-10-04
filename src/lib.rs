@@ -26,3 +26,4 @@ pub mod scheduler;
 // Re-exports
 pub use job::{Job, TimeSpan};
 pub use job::TimeSpan::*;
+pub use scheduler::Scheduler;

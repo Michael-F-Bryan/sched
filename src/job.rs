@@ -108,16 +108,16 @@ impl Job {
             TimeSpan::Week | TimeSpan::Weeks => Duration::weeks(n),
         };
 
-        // Update the next_run
-        self.next_run = Some(self.last_run + self.duration);
 
         self.duration = self.duration + new_duration;
 
+        // Update the next_run
+        self.next_run = Some(self.last_run + self.duration);
     }
 
     /// Give the job a closure to run and validate that everything has been
     /// entered correctly.
-    pub fn run(mut self, f: Func) -> Result<Job, String> {
+    pub fn do_(mut self, f: Func) -> Result<Job, String> {
         self.func = Some(f);
         self.validate()
     }
@@ -154,6 +154,11 @@ impl Job {
             self.next_run = None;
         } else {
             self.next_run = Some(Local::now() + self.duration);
+        }
+
+        match self.name {
+            Some(ref name) => info!("Running {}", name),
+            None => (),
         }
 
         match self.func {
@@ -201,7 +206,7 @@ mod tests {
 
     #[test]
     fn ideal_use() {
-        let job = Job::every(5, Minutes).run(Box::new(|| println!("Hello World!"))).unwrap();
+        let job = Job::every(5, Minutes).do_(Box::new(|| println!("Hello World!"))).unwrap();
         assert!(job.is_periodic());
 
         let duration = Duration::minutes(5);
@@ -241,7 +246,7 @@ mod tests {
         // Create a job that runs every 5 minutes and will simply increment
         // our number (which is wrapped in an Arc and a mutex
         let mut job = Job::every(5, Minutes)
-            .run(Box::new(move || {
+            .do_(Box::new(move || {
                 let mut n = num_2.lock().unwrap();
                 *n = 42;
             }))
@@ -281,7 +286,7 @@ mod tests {
     #[test]
     fn make_sure_once_off_only_executes_once() {
         let mut job = Job::in_(1, Second)
-            .run(Box::new(|| {
+            .do_(Box::new(|| {
                 1 + 1;
             }))
             .unwrap();
